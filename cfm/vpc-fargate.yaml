@@ -1,0 +1,171 @@
+# Script responsible for the VPC, subnets and Internet communication
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy VPC Resources
+Resources:
+  # Our VPC
+  PubPrivateVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: 172.31.0.0/16
+  # Used to reach the Internet
+  PublicSubnetA:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Sub "${AWS::Region}a"
+      CidrBlock: 172.31.1.0/24
+      MapPublicIpOnLaunch: true
+  # Used to reach the Internet
+  PublicSubnetB:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Sub "${AWS::Region}b"
+      CidrBlock: 172.31.2.0/24
+      MapPublicIpOnLaunch: true
+  # Used to deploy the applications
+  PrivateSubnetA:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Sub "${AWS::Region}a"
+      CidrBlock: 172.31.3.0/24
+      MapPublicIpOnLaunch: false
+  # Used to deploy the applications
+  PrivateSubnetB:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      AvailabilityZone: !Sub "${AWS::Region}b"
+      CidrBlock: 172.31.4.0/24
+      MapPublicIpOnLaunch: false
+  # Used to reach the Internet
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [_, [!Ref 'AWS::StackName']]
+        - Key: Network
+          Value: Public
+  # Used to reach the Internet
+  GatewayToInternet:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      InternetGatewayId: !Ref InternetGateway
+  # Used to reach the Internet
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      Tags:
+        - Key: Network
+          Value: Public
+  # Used to reach the Internet
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  # Used to reach the Internet
+  PublicSubnetARouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  # Used to reach the Internet
+  PublicSubnetBRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+  # Used to reach the Internet
+  NatGatewayA:
+    Type: "AWS::EC2::NatGateway"
+    DependsOn: NatPublicEIPA
+    Properties: 
+      AllocationId: !GetAtt NatPublicEIPA.AllocationId
+      SubnetId: !Ref PublicSubnetA
+  # Used to reach the Internet
+  NatGatewayB:
+    Type: "AWS::EC2::NatGateway"
+    DependsOn: NatPublicEIPB
+    Properties: 
+      AllocationId: !GetAtt NatPublicEIPB.AllocationId
+      SubnetId: !Ref PublicSubnetB
+  # Used to reach the Internet
+  NatPublicEIPA:
+    Type: "AWS::EC2::EIP"
+    DependsOn: PubPrivateVPC
+    Properties:
+      Domain: vpc
+  # Used to reach the Internet
+  NatPublicEIPB:
+    Type: "AWS::EC2::EIP"
+    DependsOn: PubPrivateVPC
+    Properties:
+      Domain: vpc
+  # Used for internal communication
+  PrivateRouteTableA:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      Tags:
+        - Key: Network
+          Value: Private
+  # Used for internal communication
+  PrivateRouteTableB:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref PubPrivateVPC
+      Tags:
+        - Key: Network
+          Value: Private
+  # Used for internal communication
+  PrivateRouteA:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+  # Used for internal communication
+  PrivateRouteB:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayB
+  # Used for internal communication
+  PrivateSubnetARouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTableA
+  # Used for internal communication
+  PrivateSubnetBRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTableB
+Outputs:
+  # Used to create ECS resources
+  PubPrivateVPC:
+    Description: The ID of the VPC
+    Value: !Ref PubPrivateVPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+  # Used to create ECS resources
+  PrivateSubnetA:
+    Description: The ID of the Subnet A
+    Value: !Ref PrivateSubnetA
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnetAID"
+  # Used to create ECS resources
+  PrivateSubnetB:
+    Description: The ID of the Subnet B
+    Value: !Ref PrivateSubnetB
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnetBID"

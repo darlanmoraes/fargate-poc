@@ -1,0 +1,238 @@
+# Script responsible for the applications resources, as:
+# - Cluster
+# - Service
+# - Policies
+# - Tasks
+# - Load Balancers
+# - Security Groups
+# - Auto Scaling
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy APP Resources
+Parameters:
+  # Refers to our VPC
+  VPCStackName:
+    Type: String
+    Default: fargate-poc-aw-vpc
+  # Image to deploy
+  Image:
+    Type: String
+  # Name of the Service in the Cluster
+  ServiceName:
+    Type: String
+  # Port used by the Task
+  ContainerPort:
+    Type: Number
+    Default: 8080
+  # Load Balancer external communication port
+  # Private subnet, so no worries
+  LoadBalancerPort:
+    Type: Number
+    Default: 80
+  # Minimum number of containers to deploy
+  MinContainers:
+    Type: Number
+    Default: 2
+  # Maximum number of containers to deploy
+  MaxContainers:
+    Type: Number
+    Default: 10
+  # Threshold for the new instances creation(CPU)
+  AutoScalingTargetValue:
+    Type: Number
+    Default: 50
+Resources:
+  # Our Cluster
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Join ['', [!Ref ServiceName, Cluster]]
+  # Task definition configuration
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: LogGroup
+    Properties:
+      Family: !Join ['', [!Ref ServiceName, TaskDefinition]]
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: 256
+      Memory: 0.5GB
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Image: !Ref Image
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+          # Log configuration (CloudWatch)
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+  # Permission to execute Tasks
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ServiceName, ExecutionRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ServiceName, TaskRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+  # Permission to scale Tasks
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['', [!Ref ServiceName, AutoScalingRole]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'
+  # Security Group for internal communication
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Join ['', [!Ref ServiceName, ContainerSecurityGroup]]
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          CidrIp: 0.0.0.0/0
+  # Service to be created in the Cluster
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - ListenerTCP
+    Properties: 
+      ServiceName: !Ref ServiceName
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 2
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      # Using our private Subnets
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          Subnets:
+            - Fn::ImportValue:
+                Fn::Sub: "${VPCStackName}-PrivateSubnetAID"
+            - Fn::ImportValue:
+                Fn::Sub: "${VPCStackName}-PrivateSubnetBID"
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: !Ref ServiceName
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref TargetGroup
+  # Target Group that evaluates our application health
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name: !Join ['', [!Ref ServiceName, TargetGroup]]
+      Port: !Ref ContainerPort
+      Protocol: TCP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      TargetType: ip
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: "${VPCStackName}-VPCID"
+  # Our Target Group Listener that redirects traffic
+  ListenerTCP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: !Ref LoadBalancerPort
+      Protocol: TCP
+  # VPC Link used by API Gateway to expose our service to the Internet
+  VpcLink:
+    Type: AWS::ApiGateway::VpcLink
+    Properties:
+        Description: "MyDescription"
+        Name: !Join ['', [!Ref ServiceName, VpcLink]]
+        TargetArns:
+            - !Ref LoadBalancer
+  # Our Internal Load Balancer, used by the API Gateway with the VPC Link
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: network
+      Name: !Join ['', [!Ref ServiceName, LoadBalancer]]
+      Scheme: internal
+      Subnets:
+        - Fn::ImportValue:
+            Fn::Sub: "${VPCStackName}-PrivateSubnetAID"
+        - Fn::ImportValue:
+            Fn::Sub: "${VPCStackName}-PrivateSubnetBID"
+  # Log configuration used by the Tasks
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['', [/ecs/, !Ref ServiceName, TaskDefinition]]
+  # Auto Scaling target used by the Tasks
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref MinContainers
+      MaxCapacity: !Ref MaxContainers
+      ResourceId: !Join ['/', [service, !Ref Cluster, !GetAtt Service.Name]]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      RoleARN: !GetAtt AutoScalingRole.Arn
+  AutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Join ['', [!Ref ServiceName, AutoScalingPolicy]]
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 10
+        ScaleOutCooldown: 10
+        TargetValue: !Ref AutoScalingTargetValue
+Outputs:
+  # Used for communication between private Subnet and API Gateway
+  VpcLink:
+    Description: The VpcLink for Api Gateway
+    Value: !Ref VpcLink
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCLinkID"
+  # Used for communication between Load Balancer and API Gateway
+  LoadBalancerDNSName:
+    Description: The LoadBalancer DNS name
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-LoadBalancerDNSName"

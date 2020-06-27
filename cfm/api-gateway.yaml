@@ -1,0 +1,69 @@
+# Script responsible for the API Gateway configuration
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy Api Resources
+Parameters:
+  # Used to create the stage
+  StageName:
+    Type: "String"
+    AllowedPattern: "^[a-z0-9]+$"
+    Default: "prd"
+  # Stack with the Load Balancer and VPC Link
+  ECSStackName:
+    Type: String
+  # Whether or not should it use AWS_IAM
+  ApplyIAMAuth:
+    Default: true
+    Type: String
+    AllowedValues: [true, false]
+Conditions:
+  ShouldApplyIAMAuth:
+    !Equals [true, !Ref ApplyIAMAuth]
+Resources:
+  # Our Api
+  Api:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: !Ref ECSStackName
+  # The main Resource
+  Resource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt Api.RootResourceId
+      RestApiId: !Ref Api
+      PathPart: '{proxy+}'
+  # A simple proxy to the internal Load Balancer
+  ProxyMethod:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      HttpMethod: ANY
+      ResourceId: !Ref Resource
+      RestApiId: !Ref Api
+      AuthorizationType: !If [ShouldApplyIAMAuth, AWS_IAM, NONE]
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        ConnectionType: VPC_LINK
+        ConnectionId:
+          Fn::ImportValue: !Sub "${ECSStackName}-VPCLinkID"
+        CacheKeyParameters:
+          - 'method.request.path.proxy'
+        RequestParameters:
+          integration.request.path.proxy: 'method.request.path.proxy'
+        IntegrationHttpMethod: ANY
+        Type: HTTP_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - "http://"
+              - Fn::ImportValue: !Sub "${ECSStackName}-LoadBalancerDNSName"
+              - "/{proxy}"
+        PassthroughBehavior: WHEN_NO_MATCH
+        IntegrationResponses:
+          - StatusCode: 200
+  Deployment:
+    DependsOn:
+      - ProxyMethod
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref Api
+      StageName: !Ref StageName
