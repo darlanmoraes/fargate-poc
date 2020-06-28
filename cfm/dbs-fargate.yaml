@@ -1,4 +1,6 @@
+# Script responsible for MySQL database and ElasticSearch.
 AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy DBS Resources
 Parameters:
   # Refers to our VPC
   VPCStackName:
