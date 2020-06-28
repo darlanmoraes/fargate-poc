@@ -1,0 +1,296 @@
+{
+	"info": {
+		"_postman_id": "faf5798d-b2f4-41df-b004-d529cca38851",
+		"name": "FARGATE-POC",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "WEB - AUTH = NONE",
+			"item": [
+				{
+					"name": "TEST INTERNET CONN 0",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{web_url}}/todos",
+							"host": [
+								"{{web_url}}"
+							],
+							"path": [
+								"todos"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TEST INTERNET CONN 1",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{web_url}}/todos/1",
+							"host": [
+								"{{web_url}}"
+							],
+							"path": [
+								"todos",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TEST MYSQL CONN",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{web_url}}/mysql",
+							"host": [
+								"{{web_url}}"
+							],
+							"path": [
+								"mysql"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TEST ELASTIC SEARCH CONN",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{web_url}}/es",
+							"host": [
+								"{{web_url}}"
+							],
+							"path": [
+								"es"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"protocolProfileBehavior": {}
+		},
+		{
+			"name": "API - AUTH = AWS_IAM",
+			"item": [
+				{
+					"name": "TEST INTERNET CONN 0",
+					"request": {
+						"auth": {
+							"type": "awsv4",
+							"awsv4": [
+								{
+									"key": "secretKey",
+									"value": "{{secret_key}}",
+									"type": "string"
+								},
+								{
+									"key": "accessKey",
+									"value": "{{access_key}}",
+									"type": "string"
+								},
+								{
+									"key": "region",
+									"value": "us-east-1",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/todos",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"todos"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TEST INTERNET CONN 1",
+					"request": {
+						"auth": {
+							"type": "awsv4",
+							"awsv4": [
+								{
+									"key": "secretKey",
+									"value": "{{secret_key}}",
+									"type": "string"
+								},
+								{
+									"key": "accessKey",
+									"value": "{{access_key}}",
+									"type": "string"
+								},
+								{
+									"key": "region",
+									"value": "us-east-1",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/todos/1",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"todos",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TEST MYSQL CONN",
+					"request": {
+						"auth": {
+							"type": "awsv4",
+							"awsv4": [
+								{
+									"key": "secretKey",
+									"value": "{{secret_key}}",
+									"type": "string"
+								},
+								{
+									"key": "accessKey",
+									"value": "{{access_key}}",
+									"type": "string"
+								},
+								{
+									"key": "region",
+									"value": "us-east-1",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/mysql",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"mysql"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TEST ELASTIC SEARCH CONN",
+					"request": {
+						"auth": {
+							"type": "awsv4",
+							"awsv4": [
+								{
+									"key": "secretKey",
+									"value": "{{secret_key}}",
+									"type": "string"
+								},
+								{
+									"key": "accessKey",
+									"value": "{{access_key}}",
+									"type": "string"
+								},
+								{
+									"key": "region",
+									"value": "us-east-1",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/es",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"es"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"protocolProfileBehavior": {}
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"id": "93058bee-dbcb-403a-b4a4-2ddfe93ce9dd",
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"id": "79189a50-451c-4c12-8bf0-c5760b3de1a0",
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"id": "0f29cbd4-1506-4ad9-a34f-1d66cf0ea92b",
+			"key": "web_url",
+			"value": "http://"
+		},
+		{
+			"id": "be93b9a0-3ed8-4ebd-b2b1-93ed43140c0e",
+			"key": "api_url",
+			"value": "http://"
+		},
+		{
+			"id": "66a28705-4405-4938-8ba0-d77168f864c1",
+			"key": "access_key",
+			"value": "FILL_THIS"
+		},
+		{
+			"id": "51c6889c-3e89-4336-8a04-1453c983f4c7",
+			"key": "secret_key",
+			"value": "FILL_THIS"
+		}
+	],
+	"protocolProfileBehavior": {}
+}
