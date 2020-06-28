@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  DBName:
+    Default: fargate_poc
+    Type: String
+  DBUser:
+    Default: fargate_poc
+    NoEcho: 'true'
+    Type: String
+  DBPassword:
+    Default: fargate_poc
+    NoEcho: 'true'
+    Type: String
+  DBAllocatedStorage:
+    Default: 5
+    Type: Number
+  DBInstanceClass:
+    Default: db.t2.small
+    Type: String
+  EC2SecurityGroup:
+    Default: default
+    Type: String
+  MultiAZ:
+    Default: 'false'
+    Type: String
+Resources:
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open database for access
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        SourceSecurityGroupName: !Ref 'EC2SecurityGroup'
+  MasterDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref 'DBName'
+      AllocatedStorage: !Ref 'DBAllocatedStorage'
+      DBInstanceClass: !Ref 'DBInstanceClass'
+      Engine: MySQL
+      MasterUsername: !Ref 'DBUser'
+      MasterUserPassword: !Ref 'DBPassword'
+      MultiAZ: !Ref 'MultiAZ'
+      Tags:
+      - Key: Name
+        Value: Master Database
+      VPCSecurityGroups: [!GetAtt [DBEC2SecurityGroup, GroupId]]
+    DeletionPolicy: Snapshot
+  ReplicaDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      SourceDBInstanceIdentifier: !Ref 'MasterDB'
+      DBInstanceClass: !Ref 'DBInstanceClass'
+      Tags:
+      - Key: Name
+        Value: Read Replica Database
+Outputs:
+  MasterJDBCConnectionString:
+    Description: JDBC connection string for the master database
+    Value: !Join ['', ['jdbc:mysql://', !GetAtt [MasterDB, Endpoint.Address], ':',
+        !GetAtt [MasterDB, Endpoint.Port], /, !Ref 'DBName']]
+  ReplicaJDBCConnectionString:
+    Description: JDBC connection string for the replica database
+    Value: !Join ['', ['jdbc:mysql://', !GetAtt [ReplicaDB, Endpoint.Address], ':',
+        !GetAtt [ReplicaDB, Endpoint.Port], /, !Ref 'DBName']]

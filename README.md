@@ -21,6 +21,13 @@ aws cloudformation create-stack \
   --stack-name fargate-poc-aw-vpc
 ```
 
+### Deploy RDS - MySQL
+```
+aws cloudformation create-stack \
+  --template-body file://cfm/dbs-fargate.yaml \
+  --stack-name fargate-poc-aw-dbs
+```
+
 ### Deploy ECS - API
 ```
 aws cloudformation create-stack \
