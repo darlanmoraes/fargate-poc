@@ -2,7 +2,8 @@
 
 const express = require("express");
 const got = require("got");
-const mysql = require('mysql');
+const mysql = require("mysql");
+const elasticsearch = require("elasticsearch");
 
 const PORT = 8080;
 const HOST = "0.0.0.0";
@@ -13,12 +14,17 @@ const OPTS = {
 
 const app = express();
 
-function newConnection() {
-  console.log(`JDBC: ${process.env.JDBC_HOST}`);
+function newMysqlConnection() {
   return mysql.createConnection({
     host : process.env.JDBC_HOST,
     user : "fargate_poc",
     password : "fargate_poc"
+  });
+}
+
+function newElasticConnection() {
+  return new elasticsearch.Client( {  
+    hosts: [ process.env.ES_HOST ]
   });
 }
 
@@ -38,15 +44,23 @@ app.get("/todos/:id", async (req, res) => {
 });
 
 app.get("/mysql", (req, res) => {
-  const connection = newConnection();
+  const connection = newMysqlConnection();
   connection.connect(function (err) {
-    console.log(err);
     const done = !err;
     if (done) {
       connection.end();
     }
     res.send({ web_mysql: done });
   });
+});
+
+app.get("/es", (req, res) => {
+  const client = newElasticConnection();
+  client.cluster
+    .health({}, function (err, resp, status) {  
+      const done = !err;
+      res.send({ web_es: done });
+    });
 });
 
 app.listen(PORT, HOST);

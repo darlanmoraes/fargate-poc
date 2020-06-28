@@ -4,27 +4,42 @@ Parameters:
   VPCStackName:
     Type: String
     Default: fargate-poc-aw-vpc
+  # MySQL database
   DBName:
     Default: fargate_poc
     Type: String
+  # MySQL username
   DBUser:
     Default: fargate_poc
     NoEcho: 'true'
     Type: String
+  # MySQL password
   DBPassword:
     Default: fargate_poc
     NoEcho: 'true'
     Type: String
+  # MySQL storage
   DBAllocatedStorage:
     Default: 5
     Type: Number
+  # MySQL class
   DBInstanceClass:
     Default: db.t2.small
     Type: String
+  # MySQL zone
   MultiAZ:
     Default: 'false'
     Type: String
+  # ElasticSearch class
+  NodeType:
+    Type: String
+    Default: t2.small.elasticsearch
+  # How many ElasticSearch
+  NodeCount:
+    Type: Number
+    Default: '1'
 Resources:
+  # MySQL is installed in the Private Subnet
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
@@ -32,6 +47,7 @@ Resources:
       SubnetIds:
         - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnetAID"
         - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnetBID"
+  # Permit internal access
   DBEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -44,6 +60,7 @@ Resources:
           FromPort: '3306'
           ToPort: '3306'
           CidrIp: 0.0.0.0/0
+  # DB Instance configuration
   MasterDB:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -60,15 +77,85 @@ Resources:
         Value: Master Database
       VPCSecurityGroups: [!GetAtt [DBEC2SecurityGroup, GroupId]]
     DeletionPolicy: Snapshot
+  # Our ElasticSearch
+  ElasticsearchDomain:
+    Type: AWS::Elasticsearch::Domain
+    Properties:
+      DomainName: fargate-poc
+      ElasticsearchClusterConfig:
+        DedicatedMasterEnabled: 'false'
+        InstanceCount:
+          Ref: NodeCount
+        ZoneAwarenessEnabled: 'false'
+        InstanceType:
+          Ref: NodeType
+      ElasticsearchVersion: '5.1'
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+        - Action:
+          - es:ESHttpGet
+          - es:ESHttpPut
+          - es:ESHttpPost
+          - es:ESHttpHead
+          Principal: "*"
+          Effect: Allow
+          # Remove the comments if you want it private
+          # Condition:
+          #   IpAddress:
+          #     aws:SourceIp:
+          #       - Fn::ImportValue: !Sub "${VPCStackName}-NatPublicEIPAID"
+          #       - Fn::ImportValue: !Sub "${VPCStackName}-NatPublicEIPBID"
+      EBSOptions:
+        EBSEnabled: true
+        Iops: 0
+        VolumeSize: 10
+        VolumeType: gp2
+      SnapshotOptions:
+        AutomatedSnapshotStartHour: '0'
+      AdvancedOptions:
+        rest.action.multi.allow_explicit_index: 'true'
 Outputs:
+  # Our MySQL connection string
   MasterJDBCConnectionString:
     Description: JDBC connection string for the master database
     Value: !Join ['', ['jdbc:mysql://', !GetAtt [MasterDB, Endpoint.Address], ':',
         !GetAtt [MasterDB, Endpoint.Port], /, !Ref 'DBName']]
     Export:
       Name: !Sub "${AWS::StackName}-JDBCConnectionUrl"
+  # Our MySQL host
   MasterHost:
     Description: JDBC host for the master database
     Value: !GetAtt [MasterDB, Endpoint.Address]
     Export:
       Name: !Sub "${AWS::StackName}-JDBCHost"
+  # The URL for Kibana
+  KibanaURL:
+    Description: Kibana URL
+    Value:
+      Fn::Join:
+      - ''
+      - - Fn::GetAtt:
+          - ElasticsearchDomain
+          - DomainEndpoint
+        - "/_plugin/kibana/"
+    Export:
+      Name: !Sub "${AWS::StackName}-KibanaEndpoint"
+  # The ElastiSearch endpoint
+  ElasticsearchEndpoint:
+    Description: Elasticsearch domain endpoint
+    Value:
+      Fn::GetAtt:
+      - ElasticsearchDomain
+      - DomainEndpoint
+    Export:
+      Name: !Sub "${AWS::StackName}-ESEndpoint"
+  # The ElasticSearch arn
+  ElasticsearchDomainARN:
+    Description: Elasticsearch domain ARN
+    Value:
+      Fn::GetAtt:
+      - ElasticsearchDomain
+      - DomainArn
+    Export:
+      Name: !Sub "${AWS::StackName}-ESARN"

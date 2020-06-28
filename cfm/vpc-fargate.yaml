@@ -169,3 +169,15 @@ Outputs:
     Value: !Ref PrivateSubnetB
     Export:
       Name: !Sub "${AWS::StackName}-PrivateSubnetBID"
+  # Used to create ElasticSearch resources
+  NatPublicEIPA:
+    Description: The IP of the NAT A
+    Value: !Ref NatPublicEIPA
+    Export:
+      Name: !Sub "${AWS::StackName}-NatPublicEIPAID"
+  # Used to create ElasticSearch resources
+  NatPublicEIPB:
+    Description: The IP of the NAT B
+    Value: !Ref NatPublicEIPB
+    Export:
+      Name: !Sub "${AWS::StackName}-NatPublicEIPBID"

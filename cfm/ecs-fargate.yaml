@@ -72,6 +72,9 @@ Resources:
             - Name: JDBC_HOST
               Value:
                 Fn::ImportValue: !Sub "${DBSStackName}-JDBCHost"
+            - Name: ES_HOST
+              Value:
+                Fn::ImportValue: !Sub "${DBSStackName}-ESEndpoint"
           PortMappings:
             - ContainerPort: !Ref ContainerPort
           # Log configuration (CloudWatch)
