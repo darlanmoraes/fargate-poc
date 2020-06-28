@@ -35,7 +35,8 @@ aws cloudformation create-stack \
   --capabilities CAPABILITY_NAMED_IAM \
   --stack-name fargate-poc-ct-api \
   --parameters ParameterKey=Image,ParameterValue=<public-repository>/fargate-api \
-  ParameterKey=ServiceName,ParameterValue=fargate-poc-ct-api
+  ParameterKey=ServiceName,ParameterValue=fargate-poc-ct-api \
+  ParameterKey=DBSStackName,ParameterValue=fargate-poc-aw-dbs
 ```
 
 ### Deploy ECS - WEB
@@ -46,7 +47,8 @@ aws cloudformation create-stack \
   --stack-name fargate-poc-ct-web \
   --parameters ParameterKey=Image,ParameterValue=<public-repository>/fargate-web \
   ParameterKey=ServiceName,ParameterValue=fargate-poc-ct-web \
-  ParameterKey=MinContainers,ParameterValue=1 
+  ParameterKey=MinContainers,ParameterValue=1 \
+  ParameterKey=DBSStackName,ParameterValue=fargate-poc-aw-dbs
 ```
 
 ### Deploy API - API Gateway

@@ -13,6 +13,9 @@ Parameters:
   VPCStackName:
     Type: String
     Default: fargate-poc-aw-vpc
+  # Stack with the Load Balancer and VPC Link
+  DBSStackName:
+    Type: String
   # Image to deploy
   Image:
     Type: String
@@ -62,6 +65,13 @@ Resources:
       ContainerDefinitions:
         - Name: !Ref ServiceName
           Image: !Ref Image
+          Environment:
+            - Name: JDBC_CONNECTION_URL
+              Value:
+                Fn::ImportValue: !Sub "${DBSStackName}-JDBCConnectionUrl"
+            - Name: JDBC_HOST
+              Value:
+                Fn::ImportValue: !Sub "${DBSStackName}-JDBCHost"
           PortMappings:
             - ContainerPort: !Ref ContainerPort
           # Log configuration (CloudWatch)

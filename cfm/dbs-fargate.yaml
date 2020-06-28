@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
+  # Refers to our VPC
+  VPCStackName:
+    Type: String
+    Default: fargate-poc-aw-vpc
   DBName:
     Default: fargate_poc
     Type: String
@@ -17,22 +21,29 @@ Parameters:
   DBInstanceClass:
     Default: db.t2.small
     Type: String
-  EC2SecurityGroup:
-    Default: default
-    Type: String
   MultiAZ:
     Default: 'false'
     Type: String
 Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS DB Instance
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnetAID"
+        - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnetBID"
   DBEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Open database for access
+      GroupDescription: Open database for internal access
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStackName}-VPCID"
       SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: '3306'
-        ToPort: '3306'
-        SourceSecurityGroupName: !Ref 'EC2SecurityGroup'
+        - IpProtocol: tcp
+          FromPort: '3306'
+          ToPort: '3306'
+          CidrIp: 0.0.0.0/0
   MasterDB:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -43,25 +54,21 @@ Resources:
       MasterUsername: !Ref 'DBUser'
       MasterUserPassword: !Ref 'DBPassword'
       MultiAZ: !Ref 'MultiAZ'
+      DBSubnetGroupName: !Ref DBSubnetGroup
       Tags:
       - Key: Name
         Value: Master Database
       VPCSecurityGroups: [!GetAtt [DBEC2SecurityGroup, GroupId]]
     DeletionPolicy: Snapshot
-  ReplicaDB:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      SourceDBInstanceIdentifier: !Ref 'MasterDB'
-      DBInstanceClass: !Ref 'DBInstanceClass'
-      Tags:
-      - Key: Name
-        Value: Read Replica Database
 Outputs:
   MasterJDBCConnectionString:
     Description: JDBC connection string for the master database
     Value: !Join ['', ['jdbc:mysql://', !GetAtt [MasterDB, Endpoint.Address], ':',
         !GetAtt [MasterDB, Endpoint.Port], /, !Ref 'DBName']]
-  ReplicaJDBCConnectionString:
-    Description: JDBC connection string for the replica database
-    Value: !Join ['', ['jdbc:mysql://', !GetAtt [ReplicaDB, Endpoint.Address], ':',
-        !GetAtt [ReplicaDB, Endpoint.Port], /, !Ref 'DBName']]
+    Export:
+      Name: !Sub "${AWS::StackName}-JDBCConnectionUrl"
+  MasterHost:
+    Description: JDBC host for the master database
+    Value: !GetAtt [MasterDB, Endpoint.Address]
+    Export:
+      Name: !Sub "${AWS::StackName}-JDBCHost"
